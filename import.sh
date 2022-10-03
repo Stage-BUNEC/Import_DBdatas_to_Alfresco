@@ -4,19 +4,22 @@
 # [ Description ] : Script d'envoie des donnees dans Alfresco (PDF + metadonnees)
 # [ Author(s) ]   : Mr MANI / NANFACK STEVE
 
-#csvfile=en4201_reprise_naissance.csv
+# Test du nombre d'arguments
+if [ "$#" -ne 1 ]; then
+    echo -e "\nMauvais usage du script: \nSaisissez: ./import.sh fichier.csv \n"
+    exit 1
+fi
+
+date=$(date --rfc-3339=seconds)
 csvFile=$1
-
-# Recupere Nbre de Ligne
-#nbrLign=$(grep -c "" "$csvFile")
-
-# Recupere Nbre de Champ
-# nbrColn=$(awk -F# '{print NF; exit;}' "$csvFile")
+if [ ! -e "$csvFile" ]; then
+    echo -e "\nErreur: Fichier Inexistant\n"
+    exit 1
+fi
 
 # Creation Tablau Associatif
 declare -A postFiedls=()
 
-i=1
 while read -r ligne; do
 
     IFS="#" read -r -a datas <<<"$(echo "$ligne" | cat)"
@@ -75,24 +78,23 @@ while read -r ligne; do
     ticket=$(echo "$reponse" | cut -d'"' -f6)
 
     # Recupere l'ID du dossier Partage/Shared
-    rep=$(curl -s -X GET "http://172.16.1.99:8080/alfresco/api/-default-/public/alfresco/versions/1/nodes/-root-/children?alf_ticket=${ticket}")
-    sharedID=$(echo "$rep" | cut -d'"' -f258)
+    rep1=$(curl -s -X GET "http://172.16.1.99:8080/alfresco/api/-default-/public/alfresco/versions/1/nodes/-root-/children?alf_ticket=${ticket}")
+    sharedID=$(echo "$rep1" | cut -d'"' -f258)
 
     # Creation noeud/Dossier dans Partage/Shared
-    dossier=${postFiedls['registre']}
-    rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://172.16.1.99:8080/alfresco/api/-default-/public/alfresco/versions/1/nodes/${sharedID}/children?alf_ticket=${ticket}" -d '{"name":"'"$dossier"'", "nodeType":"cm:folder"}')
+    rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://172.16.1.99:8080/alfresco/api/-default-/public/alfresco/versions/1/nodes/${sharedID}/children?alf_ticket=${ticket}" -d '{"name":"'"${postFiedls['registre']}"'", "nodeType":"cm:folder"}')
     echo "$rep2" | grep "statusCode"
 
-    # Envoie des donnees
-    curl -s -X POST -H "Content-Type: multipart/form-data" -F "filedata"="@${postFiedls['fileName']}" -F "relativePath"="${postFiedls['registre']}" \
-        -F "bc:numact"="${postFiedls['num_acte']}" -F "bc:firstname"="${postFiedls['nom']}" -F "bc:lastname"="${postFiedls['prenom']}" -F "bc:bornOnThe"="${postFiedls['dateNaiss']}" -F "bc:bornAt"="${postFiedls['lieuNaiss']}" -F "bc:sex"="${postFiedls['sexe']}" \
-        -F "bc:of"="${postFiedls['nomsPere']}" -F "bc:fOnThe"="" -F "bc:fAt"="${postFiedls['lieuNaissPere']}" -F "bc:fresid"="${postFiedls['domicilePere']}" -F "bc:foccupation"="${postFiedls['professionPere']}" -F "bc:fnationality"="${postFiedls['nationalitePere']}" -F "bc:fdocref"="${postFiedls['docRefPere']}" \
-        -F "bc:mof"="${postFiedls['nomsMere']}" -F "bc:mAt"="${postFiedls['lieuNaissMere']}" -F "bc:mOnThe"="" -F "bc:mresid"="${postFiedls['domicileMere']}" -F "bc:mOccupation"="${postFiedls['professionMere']}" -F "bc:mnationality"="${postFiedls['nationaliteMere']}" -F "bc:mdocref"="${postFiedls['docRefMere']}" \
-        -F "bc:drawingUp"="${postFiedls['dresseLe']}" -F "bc:ondecof"="${postFiedls['qualDeclarant']}" -F "bc:byUs"="${postFiedls['officier']}" -F "bc:assistedof"="${postFiedls['secretaire']}" -F "bc:onthe"="${postFiedls['dateSignature']}" -F "bc:mentionMarg"="${postFiedls['mentionMarg']}" \
-        "http://172.16.1.99:8080/alfresco/api/-default-/public/alfresco/versions/1/nodes/-shared-/children?alf_ticket=${ticket}"
-
-    if [ $i -eq 1 ]; then break; fi
-    i=$((i + 1))
+    # Envoie des donnees SSI le fichier existe
+    if [ -e "${postFiedls['fileName']}" ]; then
+        rep3=$(curl -s -X POST -H "Content-Type: multipart/form-data" -F "filedata"="@${postFiedls['fileName']}" -F "relativePath"="${postFiedls['registre']}" \
+            -F "bc:numact"="${postFiedls['num_acte']}" -F "bc:firstname"="${postFiedls['nom']}" -F "bc:lastname"="${postFiedls['prenom']}" -F "bc:bornOnThe"="${postFiedls['dateNaiss']}" -F "bc:bornAt"="${postFiedls['lieuNaiss']}" -F "bc:sex"="${postFiedls['sexe']}" \
+            -F "bc:of"="${postFiedls['nomsPere']}" -F "bc:fOnThe"="" -F "bc:fAt"="${postFiedls['lieuNaissPere']}" -F "bc:fresid"="${postFiedls['domicilePere']}" -F "bc:foccupation"="${postFiedls['professionPere']}" -F "bc:fnationality"="${postFiedls['nationalitePere']}" -F "bc:fdocref"="${postFiedls['docRefPere']}" \
+            -F "bc:mof"="${postFiedls['nomsMere']}" -F "bc:mAt"="${postFiedls['lieuNaissMere']}" -F "bc:mOnThe"="" -F "bc:mresid"="${postFiedls['domicileMere']}" -F "bc:mOccupation"="${postFiedls['professionMere']}" -F "bc:mnationality"="${postFiedls['nationaliteMere']}" -F "bc:mdocref"="${postFiedls['docRefMere']}" \
+            -F "bc:drawingUp"="${postFiedls['dresseLe']}" -F "bc:ondecof"="${postFiedls['qualDeclarant']}" -F "bc:byUs"="${postFiedls['officier']}" -F "bc:assistedof"="${postFiedls['secretaire']}" -F "bc:onthe"="${postFiedls['dateSignature']}" -F "bc:mentionMarg"="${postFiedls['mentionMarg']}" \
+            "http://172.16.1.99:8080/alfresco/api/-default-/public/alfresco/versions/1/nodes/-shared-/children?alf_ticket=${ticket}")
+        echo "[ $date ]: $rep3" >>send.log
+    fi
 
 done < <(grep -v "nomsenfant#prenomsenfant#datenaissenfant#lieunaissenfant#sexe#" "$csvFile")
 
