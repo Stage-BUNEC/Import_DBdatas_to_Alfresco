@@ -6,7 +6,7 @@
 
 # Test du nombre d'arguments
 if [ "$#" -ne 1 ]; then
-    echo -e "\nMauvais usage du script: \nSaisissez: ./import.sh fichier.csv \n"
+    echo -e "\nMauvais usage du script: \nSaisissez: ./import.sh path_to_file.csv \n"
     exit 1
 fi
 
