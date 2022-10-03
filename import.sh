@@ -12,7 +12,7 @@ fi
 
 csvFile=$1
 # Variables Auxiliaires
-date=$(date --rfc-3339=seconds)
+date=$(date '+%F_%X')
 path=${csvFile%/[a-zA-Z]*}/
 
 if [ ! -e "$csvFile" ]; then
