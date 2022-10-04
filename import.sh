@@ -81,15 +81,15 @@ while read -r ligne; do
 
     # Recupere ticket
     reponse=$(curl -s -X POST "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/authentication/versions/1/tickets" -H "Content-Type: application/json" -d "{\"userId\": \"${paramConn[2]}\", \"password\": \"${paramConn[3]}\" }")
-    ticket=$(echo "$reponse" | cut -d'"' -f6)
+    ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*") # ou encore ticket=$(echo "$reponse" | cut -d'"' -f6)
 
     # Recupere l'ID du dossier Partage/Shared
     rep1=$(curl -s -X GET "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/-root-/children?alf_ticket=${ticket}")
-    sharedID=$(echo "$rep1" | cut -d'"' -f258)
+    sharedID=$(echo "$rep1" | grep -E -o "\"Shared\",\"id\":\"[-a-zA-Z0-9]*" | cut -d'"' -f6) # ou encore sharedID=$(echo "$rep1" | cut -d'"' -f258)
 
     # Creation noeud/Dossier dans Partage/Shared
     rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${sharedID}/children?alf_ticket=${ticket}" -d '{"name":"'"${postFiedls['registre']}"'", "nodeType":"cm:folder"}')
-    echo "$rep2" | grep "statusCode"
+    (echo "$rep2" | grep -E -o "\"statusCode\":[0-9]*" >/dev/null) # recupere "statusCode" mais ne fait rien
 
     # Envoie des donnees SSI le fichier existe
     if [ -e "$path${postFiedls['fileName']}" ]; then
