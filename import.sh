@@ -1,18 +1,36 @@
 #!/bin/bash
 
-# [ LastUpdate ]  : 03-10-2022
-# [ Description ] : Script d'envoie des donnees dans Alfresco (PDF + metadonnees)
-# [ Author(s) ]   : Mr MANI / NANFACK STEVE
+####################################################################################################
+#                                                                                                  #
+# [ Created At ]   : 03-10-2022                                                                    #
+# [ LastUpdate ]   : 06-02-2023                                                                    #
+# [ Description ]  : Script d'envoie des donnees dans Alfresco (PDF + metadonnees)                 #
+# [ Author(s) ]    : NANFACK STEVE ULRICH                                                          #
+# [ email(s) ]     : nanfacksteve7@gmail.com                                                       #
+# [ contributors ] : Mr PROSPER OTTOU (DSI BUNEC) / Mr MANI OMGBA                                  #
+#                                                                                                  #
+####################################################################################################
 
 # Test du nombre d'arguments
-if [ "$#" -ne 1 ]; then
-    echo -e "\nMauvais usage du script: \nSaisissez: ./import.sh path_to_file.csv \n"
+if [ "$#" -ne 2 ]; then
+    echo -e "\nMauvais usage du script: \nSaisissez: ./import.sh path_to_pdf_folder path_to_file.csv \n"
     exit 1
 fi
 
-csvFile=$1
+# Test Existence Dossier/CSV
+if [ ! -d "$1" ] || [ ! -e "$2" ]; then
+    echo -e "\nCe Dossier ou fichier csv n'existe pas !!\n"
+    exit 1
+fi
+
 # Variables Auxiliaires
+full_path="$1"
+csvFile="$2"
 date=$(date '+%F_%X')
+toDay=$(date -I)
+alfr_send_log="certificate_send_$toDay.log"
+success_import_files="/home/sun/Documents/Bunec/imported"
+
 path=${csvFile%/[a-zA-Z]*}/
 
 if [ ! -e "$csvFile" ]; then
@@ -29,77 +47,101 @@ read -r -a paramConn <<<"$(grep -v "AdresseIP port user password" parametresConn
 while read -r ligne; do
 
     IFS="#" read -r -a datas <<<"$(echo "$ligne" | cat)"
+    file_name=${datas[30]} # on recupere le nom du fichier
 
-    #-------- Extraction des Meta donnees -----------#
+    # on recupere le status. (vide = non-trouve)
+    find_status=$(find "$full_path" -name "$file_name")
 
-    # Infos enfants
-    postFiedls['nom']="${datas[0]}"
-    postFiedls['prenom']="${datas[1]}"
-    postFiedls['dateNaiss']="${datas[2]}"
-    postFiedls['lieuNaiss']="${datas[3]}"
-    postFiedls['sexe']="${datas[4]}"
+    if [ -n "$find_status" ]; then
 
-    # Infos Pere enfant
-    postFiedls['nomsPere']="${datas[5]}"
-    postFiedls['dateNaissPere']="${datas[6]}"
-    postFiedls['neVersPere']="${datas[7]}"
-    postFiedls['lieuNaissPere']="${datas[25]}"
-    postFiedls['domicilePere']="${datas[8]}"
-    postFiedls['professionPere']="${datas[10]}"
-    postFiedls['nationalitePere']="${datas[9]}"
-    postFiedls['docRefPere']="${datas[24]}"
+        #-------- Extraction des Meta donnees -----------#
 
-    # Infos Mere enfant
-    postFiedls['nomsMere']="${datas[11]}"
-    postFiedls['dateNaissMere']="${datas[12]}"
-    postFiedls['neVersMere']="${datas[13]}"
-    postFiedls['lieuNaissMere']="${datas[14]}"
-    postFiedls['domicileMere']="${datas[15]}"
-    postFiedls['professionMere']="${datas[16]}"
-    postFiedls['nationaliteMere']="${datas[17]}"
-    postFiedls['docRefMere']="${datas[18]}"
+        # Creation Tablau Associatif
+        declare -A postFiedls=()
 
-    # Infos Agents
-    postFiedls['nomDeclarant']="${datas[20]}"
-    postFiedls['qualDeclarant']="${datas[21]}"
-    postFiedls['dateSignature']="${datas[22]}"
-    postFiedls['dresseLe']="${datas[26]}"
-    postFiedls['officier']="${datas[27]}"
-    postFiedls['secretaire']="${datas[28]}"
-    postFiedls['mentionMarg']="${datas[29]}"
+        # Infos enfants
+        postFiedls['nom']="${datas[0]}"
+        postFiedls['prenom']="${datas[1]}"
+        postFiedls['dateNaiss']="${datas[2]}"
+        postFiedls['lieuNaiss']="${datas[3]}"
+        postFiedls['sexe']="${datas[4]}"
 
-    # Infos fichier
-    postFiedls['num_acte']="${datas[23]}"
-    postFiedls['registre']="${datas[30]}"
-    postFiedls['fileName']="${datas[31]}"
-    postFiedls['path']="${datas[32]}"
+        # Infos Pere enfant
+        postFiedls['nomsPere']="${datas[5]}"
+        postFiedls['dateNaissPere']="${datas[6]}"
+        postFiedls['neVersPere']="${datas[7]}"
+        postFiedls['lieuNaissPere']="${datas[24]}"
+        postFiedls['domicilePere']="${datas[8]}"
+        postFiedls['professionPere']="${datas[10]}"
+        postFiedls['nationalitePere']="${datas[9]}"
+        postFiedls['docRefPere']="${datas[23]}"
 
-    # Affichage Meta Donnees
-    #for key in ${!postFiedls[*]}; do echo "$key --> ${postFiedls[$key]}"; done
+        # Infos Mere enfant
+        postFiedls['nomsMere']="${datas[11]}"
+        postFiedls['dateNaissMere']="${datas[12]}"
+        postFiedls['neVersMere']="${datas[13]}"
+        postFiedls['lieuNaissMere']="${datas[14]}"
+        postFiedls['domicileMere']="${datas[15]}"
+        postFiedls['professionMere']="${datas[16]}"
+        postFiedls['nationaliteMere']="${datas[17]}"
+        postFiedls['docRefMere']="${datas[18]}"
 
-    #------- Connexion a Alfrsco --------------#
+        # Infos Agents
+        postFiedls['nomDeclarant']="${datas[19]}"
+        postFiedls['qualDeclarant']="${datas[20]}"
+        postFiedls['dateSignature']="${datas[21]}"
+        postFiedls['dresseLe']="${datas[25]}"
+        postFiedls['officier']="${datas[26]}"
+        postFiedls['secretaire']="${datas[27]}"
+        postFiedls['mentionMarg']="${datas[28]}"
 
-    # Recupere ticket
-    reponse=$(curl -s -X POST "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/authentication/versions/1/tickets" -H "Content-Type: application/json" -d "{\"userId\": \"${paramConn[2]}\", \"password\": \"${paramConn[3]}\" }")
-    ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*") # ou encore ticket=$(echo "$reponse" | cut -d'"' -f6)
+        # Infos fichier
+        postFiedls['num_acte']="${datas[22]}"
+        postFiedls['registre']="${datas[29]}"
+        postFiedls['fileName']="${datas[30]}"
+        postFiedls['path']="${datas[31]}"
 
-    # Recupere l'ID du dossier Partage/Shared
-    rep1=$(curl -s -X GET "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/-root-/children?alf_ticket=${ticket}")
-    sharedID=$(echo "$rep1" | grep -E -o "\"Shared\",\"id\":\"[-a-zA-Z0-9]*" | cut -d'"' -f6) # ou encore sharedID=$(echo "$rep1" | cut -d'"' -f258)
+        # Affichage Meta Donnees
+        #for key in ${!postFiedls[*]}; do echo "$key --> ${postFiedls[$key]}"; done
 
-    # Creation noeud/Dossier dans Partage/Shared
-    rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${sharedID}/children?alf_ticket=${ticket}" -d '{"name":"'"${postFiedls['registre']}"'", "nodeType":"cm:folder"}')
-    (echo "$rep2" | grep -E -o "\"statusCode\":[0-9]*" >/dev/null) # recupere "statusCode" mais ne fait rien
+        # Connexion Alfresco - Recupere ticket
+        reponse=$(curl -s -X POST "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/authentication/versions/1/tickets" -H "Content-Type: application/json" -d "{\"userId\": \"${paramConn[2]}\", \"password\": \"${paramConn[3]}\" }")
+        ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*") # ou encore ticket=$(echo "$reponse" | cut -d'"' -f6)
+        #echo $ticket && exit
 
-    # Envoie des donnees SSI le fichier existe
-    if [ -e "$path${postFiedls['fileName']}" ]; then
-        rep3=$(curl -s -X POST -H "Content-Type: multipart/form-data" -F "filedata"="@$path${postFiedls['fileName']}" -F "relativePath"="${postFiedls['registre']}" \
-            -F "bc:numact"="${postFiedls['num_acte']}" -F "bc:firstname"="${postFiedls['nom']}" -F "bc:lastname"="${postFiedls['prenom']}" -F "bc:bornOnThe"="${postFiedls['dateNaiss']}" -F "bc:bornAt"="${postFiedls['lieuNaiss']}" -F "bc:sex"="${postFiedls['sexe']}" \
-            -F "bc:of"="${postFiedls['nomsPere']}" -F "bc:fOnThe"="" -F "bc:fAt"="${postFiedls['lieuNaissPere']}" -F "bc:fresid"="${postFiedls['domicilePere']}" -F "bc:foccupation"="${postFiedls['professionPere']}" -F "bc:fnationality"="${postFiedls['nationalitePere']}" -F "bc:fdocref"="${postFiedls['docRefPere']}" \
-            -F "bc:mof"="${postFiedls['nomsMere']}" -F "bc:mAt"="${postFiedls['lieuNaissMere']}" -F "bc:mOnThe"="" -F "bc:mresid"="${postFiedls['domicileMere']}" -F "bc:mOccupation"="${postFiedls['professionMere']}" -F "bc:mnationality"="${postFiedls['nationaliteMere']}" -F "bc:mdocref"="${postFiedls['docRefMere']}" \
-            -F "bc:drawingUp"="${postFiedls['dresseLe']}" -F "bc:ondecof"="${postFiedls['qualDeclarant']}" -F "bc:byUs"="${postFiedls['officier']}" -F "bc:assistedof"="${postFiedls['secretaire']}" -F "bc:onthe"="${postFiedls['dateSignature']}" -F "bc:mentionMarg"="${postFiedls['mentionMarg']}" \
-            "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/-shared-/children?alf_ticket=${ticket}")
-        echo "[ $date ]: $rep3" >>send.log
+        # Recupere l'ID du dossier Partage/Shared
+        rep1=$(curl -s -X GET "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/-root-/children?alf_ticket=${ticket}")
+        sharedID=$(echo "$rep1" | grep -E -o "\"Shared\"|\"Partagé\",\"id\":\"[-a-zA-Z0-9]*" | cut -d'"' -f6) # ou encore sharedID=$(echo "$rep1" | cut -d'"' -f258)
+        #echo $sharedID && exit
+
+        # Creation Dossier/Registre dans Partage/Shared
+        rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${sharedID}/children?alf_ticket=${ticket}" -d '{"name":"'"${postFiedls['registre']}"'", "nodeType":"cm:folder"}')
+        (echo "$rep2" | grep -E -o "\"statusCode\":[0-9]*" >/dev/null) # recupere "statusCode" mais ne fait rien
+        #echo $rep2 && exit
+
+        path="$full_path${postFiedls['registre']}/"
+
+        # Envoie des donnees SSI le fichier existe
+        if [ -e "$path${postFiedls['fileName']}" ]; then
+
+            rep3=$(curl -s -X POST -H "Content-Type: multipart/form-data" -F "filedata"="@$path${postFiedls['fileName']}" -F "relativePath"="${postFiedls['registre']}" \
+                -F "bc:numact"="${postFiedls['num_acte']}" -F "bc:firstname"="${postFiedls['nom']}" -F "bc:lastname"="${postFiedls['prenom']}" -F "bc:bornOnThe"="${postFiedls['dateNaiss']}" -F "bc:bornAt"="${postFiedls['lieuNaiss']}" -F "bc:sex"="${postFiedls['sexe']}" \
+                -F "bc:of"="${postFiedls['nomsPere']}" -F "bc:fOnThe"="" -F "bc:fAt"="${postFiedls['lieuNaissPere']}" -F "bc:fresid"="${postFiedls['domicilePere']}" -F "bc:foccupation"="${postFiedls['professionPere']}" -F "bc:fnationality"="${postFiedls['nationalitePere']}" -F "bc:fdocref"="${postFiedls['docRefPere']}" \
+                -F "bc:mof"="${postFiedls['nomsMere']}" -F "bc:mAt"="${postFiedls['lieuNaissMere']}" -F "bc:mOnThe"="" -F "bc:mresid"="${postFiedls['domicileMere']}" -F "bc:mOccupation"="${postFiedls['professionMere']}" -F "bc:mnationality"="${postFiedls['nationaliteMere']}" -F "bc:mdocref"="${postFiedls['docRefMere']}" \
+                -F "bc:drawingUp"="${postFiedls['dresseLe']}" -F "bc:ondecof"="${postFiedls['qualDeclarant']}" -F "bc:byUs"="${postFiedls['officier']}" -F "bc:assistedof"="${postFiedls['secretaire']}" -F "bc:onthe"="${postFiedls['dateSignature']}" -F "bc:mentionMarg"="${postFiedls['mentionMarg']}" \
+                "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/-shared-/children?alf_ticket=${ticket}")
+
+            # Gestion des logs
+            if [ ! -e "$alfr_send_log" ]; then echo -e "Date\t   Time\t\t Register\t\t\t File_Name\t  \t\t\tState \n" >"$alfr_send_log"; fi
+            etat=$(echo -e "$rep3" | grep -E -o "\"statusCode\":[0-9]*" | cut -d: -f2)
+            [[ $etat = "" ]] && etat="sent" || etat="exist"
+            sed -i "2i $(echo -e "$(date +'%F %X')  ${postFiedls['registre']}\t ${postFiedls['fileName']}\t$etat")" "$alfr_send_log"
+
+            # Deplacement de fichiers
+            if [ $etat = "" ] || [ $etat = "409" ]; then mv "$path${postFiedls['fileName']}" "$success_import_files"; fi
+            exit
+        fi
+
     fi
 
 done < <(grep -v "nomsenfant#prenomsenfant#datenaissenfant#lieunaissenfant#sexe#" "$csvFile")
