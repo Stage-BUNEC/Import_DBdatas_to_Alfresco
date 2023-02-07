@@ -3,8 +3,8 @@
 ####################################################################################################
 #                                                                                                  #
 # [ Created At ]   : 03-10-2022                                                                    #
-# [ LastUpdate ]   : 06-02-2023                                                                    #
-# [ Description ]  : Script d'envoie des donnees dans Alfresco (PDF + metadonnees)                 #
+# [ LastUpdate ]   : 07-02-2023                                                                    #
+# [ Description ]  : Script d'envoie des donnees dans Alfresco (PDF + metadonnees issues de la BD) #
 # [ Author(s) ]    : NANFACK STEVE ULRICH                                                          #
 # [ email(s) ]     : nanfacksteve7@gmail.com                                                       #
 # [ contributors ] : Mr PROSPER OTTOU (DSI BUNEC) / Mr MANI OMGBA                                  #
@@ -23,26 +23,33 @@ if [ ! -d "$1" ] || [ ! -e "$2" ]; then
     exit 1
 fi
 
-# Variables Auxiliaires
-full_path="$1"
-csvFile="$2"
-date=$(date '+%F_%X')
-toDay=$(date -I)
-alfr_send_log="certificate_send_$toDay.log"
-success_import_files="/home/sun/Documents/Bunec/imported"
-
-path=${csvFile%/[a-zA-Z]*}/
-
-if [ ! -e "$csvFile" ]; then
+if [ ! -e "$2" ]; then
     echo -e "\nErreur: Fichier Inexistant\n"
     exit 1
 fi
+
+# Variables Auxiliaires
+file_nbr=0
+csvFile="$2"
+full_path="$1"
+toDay=$(date -I)
+date=$(date '+%F_%X')
+alfr_send_log="certificate_send_$toDay.log"
+success_import_files="/home/sun/Documents/BUNEC/imported"
+
+# Color's Message
+grn='\e[1;32m' && red='\e[1;31m' && blu='\e[1;96m' && ylw='\e[1;93m' && nc='\e[0m'
 
 # Creation Tablau Associatif
 declare -A postFiedls=()
 
 # Recuperation des parametres de connexion
 read -r -a paramConn <<<"$(grep -v "AdresseIP port user password" parametresConnex.cfg)"
+alfresco_target=${paramConn[4]:1:-1}
+[[ -n "$(echo "${alfresco_target}" | egrep "Partagé|Shared")" ]] && alfresco_dir="Partagé|Shared" || alfresco_dir="${alfresco_target}"
+[[ -n "$(echo "${alfresco_dir}" | egrep "Partagé|Shared")" ]] && src="-root-" || src="-shared-"
+
+echo -e "\n---------------[ Importations des donnees dans $ylw(${alfresco_target})$nc ]------------------\n"
 
 while read -r ligne; do
 
@@ -109,14 +116,13 @@ while read -r ligne; do
         ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*") # ou encore ticket=$(echo "$reponse" | cut -d'"' -f6)
         #echo $ticket && exit
 
-        # Recupere l'ID du dossier Partage/Shared
-        rep1=$(curl -s -X GET "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/-root-/children?alf_ticket=${ticket}")
-        sharedID=$(echo "$rep1" | grep -E -o "\"Shared\"|\"Partagé\",\"id\":\"[-a-zA-Z0-9]*" | cut -d'"' -f6) # ou encore sharedID=$(echo "$rep1" | cut -d'"' -f258)
-        #echo $sharedID && exit
+        # Recupere l'ID du dossier $alfresco_dir
+        rep1=$(curl -s -X GET "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${src}/children?alf_ticket=${ticket}")
+        ID_dir_alfresco_=$(echo "$rep1" | grep -E -o "\"(${alfresco_dir})\",\"id\":\"[-a-zA-Z0-9]*" | cut -d'"' -f6) # ou encore ID_dir_alfresco_=$(echo "$rep1" | cut -d'"' -f258)
+        #echo $ID_dir_alfresco_ && exit
 
         # Creation Dossier/Registre dans Partage/Shared
-        rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${sharedID}/children?alf_ticket=${ticket}" -d '{"name":"'"${postFiedls['registre']}"'", "nodeType":"cm:folder"}')
-        (echo "$rep2" | grep -E -o "\"statusCode\":[0-9]*" >/dev/null) # recupere "statusCode" mais ne fait rien
+        rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${ID_dir_alfresco_}/children?alf_ticket=${ticket}" -d '{"name":"'"${postFiedls['registre']}"'", "nodeType":"cm:folder"}')
         #echo $rep2 && exit
 
         path="$full_path${postFiedls['registre']}/"
@@ -129,22 +135,36 @@ while read -r ligne; do
                 -F "bc:of"="${postFiedls['nomsPere']}" -F "bc:fOnThe"="" -F "bc:fAt"="${postFiedls['lieuNaissPere']}" -F "bc:fresid"="${postFiedls['domicilePere']}" -F "bc:foccupation"="${postFiedls['professionPere']}" -F "bc:fnationality"="${postFiedls['nationalitePere']}" -F "bc:fdocref"="${postFiedls['docRefPere']}" \
                 -F "bc:mof"="${postFiedls['nomsMere']}" -F "bc:mAt"="${postFiedls['lieuNaissMere']}" -F "bc:mOnThe"="" -F "bc:mresid"="${postFiedls['domicileMere']}" -F "bc:mOccupation"="${postFiedls['professionMere']}" -F "bc:mnationality"="${postFiedls['nationaliteMere']}" -F "bc:mdocref"="${postFiedls['docRefMere']}" \
                 -F "bc:drawingUp"="${postFiedls['dresseLe']}" -F "bc:ondecof"="${postFiedls['qualDeclarant']}" -F "bc:byUs"="${postFiedls['officier']}" -F "bc:assistedof"="${postFiedls['secretaire']}" -F "bc:onthe"="${postFiedls['dateSignature']}" -F "bc:mentionMarg"="${postFiedls['mentionMarg']}" \
-                "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/-shared-/children?alf_ticket=${ticket}")
+                "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${ID_dir_alfresco_}/children?alf_ticket=${ticket}")
 
             # Gestion des logs
-            if [ ! -e "$alfr_send_log" ]; then echo -e "Date\t   Time\t\t Register\t\t\t File_Name\t  \t\t\tState \n" >"$alfr_send_log"; fi
+            if [ ! -e "$alfr_send_log" ]; then echo -e "Date\t   Time\t\t Alfr_dir\t\t  Register\t\t\t File_Name\t  \t\t\t\tState\tTotal \n" >"$alfr_send_log"; fi
             etat=$(echo -e "$rep3" | grep -E -o "\"statusCode\":[0-9]*" | cut -d: -f2)
             [[ $etat = "" ]] && etat="sent" || etat="exist"
-            sed -i "2i $(echo -e "$(date +'%F %X')  ${postFiedls['registre']}\t ${postFiedls['fileName']}\t$etat")" "$alfr_send_log"
 
-            # Deplacement de fichiers
-            if [ $etat = "" ] || [ $etat = "409" ]; then mv "$path${postFiedls['fileName']}" "$success_import_files"; fi
-            exit
+            if [ etat="sent" ] || [ etat="exist" ]; then
+                sed -i "2i $(echo -e "$(date +'%F %X')  ${alfresco_target}\t\t  ${postFiedls['registre']}\t ${postFiedls['fileName']}\t\t$etat \t_")" "$alfr_send_log"
+                file_nbr=$((file_nbr + 1))
+                echo -e "file: ${postFiedls['fileName']}\t |  state:$grn $etat $nc\t | trated:$blu $file_nbr $nc"
+
+                # deplacement de fichiers
+                [[ ! -d "$success_import_files/${postFiedls['registre']}" ]] && mkdir -p "$success_import_files/${postFiedls['registre']}"
+                mv "$path${postFiedls['fileName']}" "$success_import_files/${postFiedls['registre']}"
+            else
+                etat="fail"
+                sed -i "2i $(echo -e "$(date +'%F %X')  ${alfresco_target}\t\t  ${postFiedls['registre']}\t ${postFiedls['fileName']}\t\t$etat \t_")" "$alfr_send_log"
+                echo -e "file: ${postFiedls['fileName']}\t |  state:$red $etat $nc\t | trated:$ylw $file_nbr $nc"
+            fi
+
         fi
 
     fi
 
 done < <(grep -v "nomsenfant#prenomsenfant#datenaissenfant#lieunaissenfant#sexe#" "$csvFile")
 
-# Suppression tableau%-
+# Infos Import
+sed -i "2i $(echo -e "$(date +'%F %X')  ${alfresco_target}\t\t\  _\t\t\t\t\t _\t\t\t\t\t\t$etat \t$file_nbr")" "$alfr_send_log"
+
+# Suppression tableau
+echo -e "\nFin Importation\n"
 unset postFiedls
