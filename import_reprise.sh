@@ -26,7 +26,7 @@ fi
 [[ ! -e "$2" ]] && echo -e "\n$red[Error] : Fichier $nc($2) $red inexistant !!! \n" && exit 1
 
 csvFile="$2"
-full_path="$1"
+[[ "$1" = */ ]] && full_path="$1" || full_path="$1/" # ajoute un '/' si necessaire
 end_path_dir="$(basename $full_path)"
 
 # Test si Dossier = [ Registre | ID_agent ]

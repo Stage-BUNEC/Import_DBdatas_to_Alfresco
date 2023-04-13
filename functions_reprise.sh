@@ -7,8 +7,8 @@ import_birth_certificate() {
     alfr_send_log="$$_birth_certificate_send_$toDay.log"
     success_import_files="/home/sun/Documents/imported"
 
-    echo -e "\n------------------[ Importations des donnees des$red Naissaces$nc ]---------------------\n"
-    echo -e "$vlt[ INFOS ] : $nc@IP = $vlt${paramConn[0]} $nc| Port = $vlt${paramConn[1]} $nc| Dossier_Cible_Alfresco = $vlt${alfresco_target}$nc \n"
+    echo -e "\n-----------------------------[ Importations des donnees des$red Naissaces$nc ]-----------------------------------\n"
+    echo -e "$vlt[ INFOS ] : $nc@IP = $vlt${paramConn[0]} $nc| Port = $vlt${paramConn[1]} $nc| Dossier_Cible_Alfresco = $vlt${alfresco_target}$nc | type_dossier = $vlt$type_dir $nc\n"
 
     while read -r ligne; do
 
