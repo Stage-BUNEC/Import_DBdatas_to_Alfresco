@@ -1,15 +1,15 @@
-import_agent() {
+import_birth_certificate() {
 
     # Variables Auxiliaires
     file_nbr=0
     toDay=$(date -I)
     date=$(date '+%F_%X')
-    alfr_send_log="$$_certificate_send_$toDay.log"
+    alfr_send_log="$$_birth_certificate_send_$toDay.log"
     success_import_files="/home/sun/Documents/imported"
 
-    echo -e "\n---------------[ Importations des donnees dans $ylw(${alfresco_target})$nc ]------------------\n"
-    echo -e "$ylw[ INFOS ] : @IP = ${paramConn[0]} - Port = ${paramConn[1]}$nc \n"
-    exit 0
+    echo -e "\n------------------[ Importations des donnees des$red Naissaces$nc ]---------------------\n"
+    echo -e "$vlt[ INFOS ] : $nc@IP = $vlt${paramConn[0]} $nc| Port = $vlt${paramConn[1]} $nc| Dossier_Cible_Alfresco = $vlt${alfresco_target}$nc \n"
+
     while read -r ligne; do
 
         IFS="#" read -r -a datas <<<"$(echo "$ligne" | cat)"
@@ -21,6 +21,15 @@ import_agent() {
         if [ -n "$find_status" ]; then
 
             #-------- Extraction des Meta donnees -----------#
+            if [ "$type_dir" = "ID" ]; then
+                temp="${find_status%/*pdf}"
+                registre="${temp#$full_path}"
+                path="$full_path${registre}/"
+
+            elif [ "$type_dir" = "register" ]; then
+                registre="$end_path_dir"
+                path="$full_path"
+            fi
 
             # Creation Tablau Associatif
             declare -A postFiedls=()
@@ -64,8 +73,6 @@ import_agent() {
             # Infos fichier
             postFiedls['num_acte']="${datas[22]}"
             #postFiedls['registre']="${datas[29]}"
-            temp="${find_status%/*pdf}"
-            registre="${temp#$full_path}"
             postFiedls['fileName']="${datas[30]}"
             postFiedls['path']="${datas[31]}"
 
@@ -77,7 +84,7 @@ import_agent() {
             statusCode=$(echo -e "$rep2" | grep -E -o "\"statusCode\":[0-9]*" | cut -d: -f2)
 
             if [ "$statusCode" = "401" ]; then
-                echo -e "--> foo\n"
+
                 # reconnexion
                 reponse=$(curl -s -X POST "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/authentication/versions/1/tickets" -H "Content-Type: application/json" -d "{\"userId\": \"${paramConn[2]}\", \"password\": \"${paramConn[3]}\" }")
                 ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*")
@@ -86,8 +93,6 @@ import_agent() {
                 rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${ID_dir_alfresco}/children?alf_ticket=${ticket}" -d '{"name":"'"${registre}"'", "nodeType":"cm:folder"}')
                 statusCode=$(echo -e "$rep2" | grep -E -o "\"statusCode\":[0-9]*" | cut -d: -f2)
             fi
-
-            path="$full_path${registre}/"
 
             # Envoie des donnees
             rep3=$(curl -s -X POST -H "Content-Type: multipart/form-data" -F "filedata"="@$path${postFiedls['fileName']}" -F "relativePath"="${registre}" \
@@ -103,6 +108,7 @@ import_agent() {
             [[ $etat = "" ]] && etat="sent" || etat="exist"
 
             if [ etat="sent" ] || [ etat="exist" ]; then
+
                 sed -i "2i $(echo -e "$(date +'%F %X')  ${alfresco_target}\t\t  ${registre}\t ${postFiedls['fileName']}\t\t$etat \t_")" "$alfr_send_log"
                 file_nbr=$((file_nbr + 1))
                 echo -e "file: ${postFiedls['fileName']}\t |  state:$grn $etat $nc\t | trated:$blu $file_nbr $nc"
@@ -110,7 +116,9 @@ import_agent() {
                 # deplacement de fichiers
                 [[ ! -d "$success_import_files/${registre}" ]] && mkdir -p "$success_import_files/${registre}"
                 mv "$path${postFiedls['fileName']}" "$success_import_files/${registre}"
+
             else
+
                 etat="fail"
                 sed -i "2i $(echo -e "$(date +'%F %X')  ${alfresco_target}\t\t  ${registre}\t ${postFiedls['fileName']}\t\t$etat \t_")" "$alfr_send_log"
                 echo -e "file: ${postFiedls['fileName']}\t |  state:$red $etat $nc\t | trated:$ylw $file_nbr $nc"
@@ -126,4 +134,12 @@ import_agent() {
     # Suppression tableau
     echo -e "\nFin Importation\n"
     unset postFiedls
+}
+
+import_weeding_certificate() {
+    echo "mariage"
+}
+
+import_death_certificate() {
+    echo "deces"
 }
