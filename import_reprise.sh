@@ -48,7 +48,7 @@ alfresco_target=${paramConn[4]:1:-1}
 # Connexion Alfresco - Recupere ticket
 reponse=$(curl -s -X POST "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/authentication/versions/1/tickets" -H "Content-Type: application/json" -d "{\"userId\": \"${paramConn[2]}\", \"password\": \"${paramConn[3]}\" }")
 ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*") # ou encore ticket=$(echo "$reponse" | cut -d'"' -f6)
-[[ -z "$ticket" ]] && echo -e "$red\n[ Error ] : Impossible de se connecter a Alfresco" && exit 1
+[[ -z "$ticket" ]] && echo -e "$red\n[ Error ] : Impossible de se connecter a Alfresco \n" && exit 1
 #echo $ticket && exit
 
 # Recupere l'ID du dossier $alfresco_dir

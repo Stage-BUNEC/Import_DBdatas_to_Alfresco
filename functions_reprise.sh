@@ -153,7 +153,7 @@ import_weeding_certificate() {
     success_import_files="$HOME/imported"
     [[ ! -d "$success_import_files" ]] && mkdir -p "$success_import_files"
 
-    echo -e "\n-----------------------------[ Importations des donnees des$red Naissaces$nc ]-----------------------------------\n"
+    echo -e "\n-----------------------------[ Importations des donnees des$red Mariages$nc ]-----------------------------------\n"
     echo -e "$vlt[ INFOS ] : $nc@IP = $vlt${paramConn[0]} $nc| Port = $vlt${paramConn[1]} $nc| Dossier_Cible_Alfresco = $vlt${alfresco_target}$nc | type_dossier = $vlt$type_dir $nc\n"
 
     while read -r ligne; do
@@ -216,6 +216,7 @@ import_weeding_certificate() {
             postFiedls['officier']="${datas[28]}"
             postFiedls['dateSignature']="${datas[29]}"
 
+            # Infos SANS VALEUR
             postFiedls['docRefPeresEpx']=""
             postFiedls['is_valid']=""
             postFiedls['nipu_epouse']=""
@@ -230,7 +231,7 @@ import_weeding_certificate() {
             postFiedls['path']="${datas[32]}"
 
             # Affichage Meta Donnees
-            #for key in ${!postFiedls[*]}; do echo "$key --> ${postFiedls[$key]}"; done
+            for key in ${!postFiedls[*]}; do echo "$key --> ${postFiedls[$key]}"; done && exit
 
             if [ "$statusCode" = "401" ]; then
 
@@ -280,9 +281,146 @@ import_weeding_certificate() {
             fi
 
         fi
-    done < <(grep -v "nomsenfant#prenomsenfant#datenaissenfant#lieunaissenfant#sexe#" "$csvFile")
+    done < <(grep -v "num_acte#noms_epoux#" "$csvFile")
 }
 
 import_death_certificate() {
-    echo "deces"
+
+    # Variables Auxiliaires
+    file_nbr=0
+    toDay=$(date -I)
+    date=$(date '+%F_%X')
+    alfr_send_log="$$_death_certificate_send_$toDay.log"
+
+    success_import_files="$HOME/imported"
+    [[ ! -d "$success_import_files" ]] && mkdir -p "$success_import_files"
+
+    echo -e "\n-----------------------------[ Importations des donnees des$red Deces$nc ]-----------------------------------\n"
+    echo -e "$vlt[ INFOS ] : $nc@IP = $vlt${paramConn[0]} $nc| Port = $vlt${paramConn[1]} $nc| Dossier_Cible_Alfresco = $vlt${alfresco_target}$nc | type_dossier = $vlt$type_dir $nc\n"
+
+    while read -r ligne; do
+
+        IFS="#" read -r -a datas <<<"$(echo "$ligne" | cat)"
+        file_name=${datas[28]} # on recupere le nom du fichier
+
+        # on recupere le status. (vide = non-trouve | non-vide = trouve = fichier existe)
+        find_status=$(find "$full_path" -name "$file_name")
+
+        if [ -n "$find_status" ]; then
+
+            #-------- Extraction des Meta donnees -----------#
+            if [ "$type_dir" = "ID" ]; then
+                temp="${find_status%/*pdf}"
+                registre="${temp#$full_path}"
+                path="$full_path${registre}/"
+
+            elif [ "$type_dir" = "register" ]; then
+                registre="$end_path_dir"
+                path="$full_path"
+            fi
+
+            # Creation Tablau Associatif
+            declare -A postFiedls=()
+
+            # Infos Defunt
+            postFiedls['noms']="${datas[1]}"
+            postFiedls['prenoms']="${datas[2]}"
+            postFiedls['dateNaiss']="${datas[3]}"
+            postFiedls['dateDeces']="${datas[4]}"
+            postFiedls['lieuDeces']="${datas[5]}"
+            postFiedls['lieuNaiss']="${datas[6]}"
+            postFiedls['sexe']="${datas[7]}"
+            postFiedls['situationMatrim']="${datas[8]}"
+            postFiedls['profession']="${datas[9]}"
+            postFiedls['domicile']="${datas[10]}"
+            postFiedls['nomsPere']="${datas[11]}"
+            postFiedls['nomsMere']="${datas[12]}"
+            postFiedls['nomFosa']="${datas[13]}"
+
+            # Infos Declarant
+            postFiedls['nomsD']="${datas[14]}"
+            postFiedls['professionD']="${datas[15]}"
+            postFiedls['qualiteStatutD']="${datas[16]}"
+
+            # Infos Temoins
+            postFiedls['nomsTemoinUn']="${datas[17]}"
+            postFiedls['professionTemoinUn']="${datas[18]}"
+            postFiedls['domicileTemoinUn']="${datas[19]}"
+            postFiedls['nomsTemoinDeux']="${datas[20]}"
+            postFiedls['professionTemoinDeux']="${datas[21]}"
+            postFiedls['domicileTemoinDeux']="${datas[22]}"
+
+            # Infos FOSA
+            postFiedls['officier']="${datas[23]}"
+            postFiedls['secretaire']="${datas[24]}"
+            postFiedls['dateSignature']="${datas[25]}"
+            postFiedls['dateVers']="${datas[26]}"
+
+            # Infos SANS VALEUR
+            postFiedls['decryptedkey']=""
+            postFiedls['drawingUp']=""
+            postFiedls['encryptedmessage']=""
+            postFiedls['is_valid']=""
+            postFiedls['NIPU']=""
+            postFiedls['nom_cec']=""
+            postFiedls['originalmessage']=""
+            postFiedls['rattachement']=""
+            postFiedls['vaidated_date']=""
+
+            # Infos fichier
+            postFiedls['num_acte']="${datas[0]}"
+            postFiedls['fileName']="${datas[28]}"
+            postFiedls['path']="${datas[29]}"
+
+            # Affichage Meta Donnees
+            for key in ${!postFiedls[*]}; do echo "$key --> ${postFiedls[$key]}"; done && exit
+
+            if [ "$statusCode" = "401" ]; then
+
+                # reconnexion
+                reponse=$(curl -s -X POST "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/authentication/versions/1/tickets" -H "Content-Type: application/json" -d "{\"userId\": \"${paramConn[2]}\", \"password\": \"${paramConn[3]}\" }")
+                ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*")
+
+                # creation registre
+                rep2=$(curl -s -X POST -H "Content-Type: application/json" "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${ID_dir_alfresco}/children?alf_ticket=${ticket}" -d '{"name":"'"${registre}"'", "nodeType":"cm:folder"}')
+                statusCode=$(echo -e "$rep2" | grep -E -o "\"statusCode\":[0-9]*" | cut -d: -f2)
+            fi
+
+            # Envoie des donnees
+            rep3=$(
+                curl -s -X POST -H "Content-Type: multipart/form-data" -F "filedata"="@$path${postFiedls['fileName']}" -F "relativePath"="${registre}" \
+                    -F "dt:numAct"="${postFiedls['num_acte']}" -F "dt:firstName"="${postFiedls['noms']}" -F "dt:lastName"="${postFiedls['prenoms']}" -F "dt:bornOnThe"="${postFiedls['dateNaiss']}" -F "dt:bornOntThe"="${postFiedls['dateNaiss']}" -F "dt:dieOnThe"="${postFiedls['dateDeces']}" -F "dt:dieAt"="${postFiedls['lieuDeces']}" -F "dt:bornAt"="${postFiedls['lieuNaiss']}" -F "dt:sex"="${postFiedls['sexe']}" -F "dt:matrimSyst"="${postFiedls['situationMatrim']}" -F "dt:occupation"="${postFiedls['profession']}" -F "dt:resid"="${postFiedls['domicile']}" \
+                    -F "dt:sonof"="${postFiedls['nomsPere']}" -F "dt:andsonof"="${postFiedls['nomsMere']}" -F "dt:inAccordancewith"="${postFiedls['nomFosa']}" -F "dt:nameofD"="${postFiedls['nomsD']}" -F "dt:occupationD"="${postFiedls['professionD']}" -F "dt:role"="${postFiedls['qualiteStatutD']}" -F "dt:fwitness"="${postFiedls['nomsTemoinUn']}" -F "dt:foccupation"="${postFiedls['professionTemoinUn']}" -F "dt:fresid"="${postFiedls['domicileTemoinUn']}" -F "dt:switness"="${postFiedls['nomsTemoinDeux']}" -F "dt:soccupation"="${postFiedls['professionTemoinDeux']}" -F "dt:sresid"="${postFiedls['domicileTemoinDeux']}" \
+                    -F "dt:byUs"="${postFiedls['officier']}" -F "dt:assitedof"="${postFiedls['secretaire']}" -F "dt:onThe"="${postFiedls['dateSignature']}" -F "dt:datevers"="${postFiedls['dateVers']}" -F "dt:decryptedkey"="" -F "dt:drawingUp"="" -F "dt:encryptedmessage"="" -F "dt:is_valid"="" -F "dt:NIPU"="" -F "dt:nom_cec"="" -F "dt:originalmessage"="" -F "dt:rattachement"="" -F "dt:vaidated_date"="" \
+                    "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${ID_dir_alfresco}/children?alf_ticket=${ticket}"
+            )
+
+            #-------- Gestion des logs -----------#
+
+            # En-tete fichier
+            if [ ! -e "$alfr_send_log" ]; then echo -e "Date\t   Time\t\t Alfr_dir\t\t  Register\t\t\t File_Name\t  \t\t\t\tState\tTotal \n" >"$alfr_send_log"; fi
+
+            # status d'envoie
+            etat=$(echo -e "$rep3" | grep -E -o "\"statusCode\":[0-9]*" | cut -d: -f2)
+            [[ $etat = "" ]] && etat="sent" || etat="exist"
+
+            if [ etat="sent" ] || [ etat="exist" ]; then
+
+                sed -i "2i $(echo -e "$(date +'%F %X')  ${alfresco_target}\t\t  ${registre}\t ${postFiedls['fileName']}\t\t$etat \t_")" "$alfr_send_log"
+                file_nbr=$((file_nbr + 1))
+                echo -e "file: ${postFiedls['fileName']}\t |  state:$grn $etat $nc\t | trated:$blu $file_nbr $nc"
+
+                # deplacement de fichiers
+                [[ ! -d "$success_import_files/${registre}" ]] && mkdir -p "$success_import_files/${registre}"
+                mv "$path${postFiedls['fileName']}" "$success_import_files/${registre}"
+
+            else
+
+                etat="fail"
+                sed -i "2i $(echo -e "$(date +'%F %X')  ${alfresco_target}\t\t  ${registre}\t ${postFiedls['fileName']}\t\t$etat \t_")" "$alfr_send_log"
+                echo -e "file: ${postFiedls['fileName']}\t |  state:$red $etat $nc\t | trated:$ylw $file_nbr $nc"
+            fi
+
+        fi
+    done < <(grep -v "num_acte#noms_prenoms_decede#" "$csvFile")
 }
