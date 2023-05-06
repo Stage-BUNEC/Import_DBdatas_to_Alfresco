@@ -52,7 +52,7 @@ ticket=$(echo "$reponse" | grep -E -o "TICKET_[a-zA-Z0-9]*") # ou encore ticket=
 #echo $ticket && exit
 
 # Recupere l'ID du dossier $alfresco_dir
-rep1=$(curl -s -X GET "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${src}/children?alf_ticket=${ticket}")
+rep1=$(curl -s -X GET "http://${paramConn[0]}:${paramConn[1]}/alfresco/api/-default-/public/alfresco/versions/1/nodes/${src}/children?maxItems=10000&orderBy=ASC&alf_ticket=${ticket}")
 ID_dir_alfresco=$(echo "$rep1" | grep -E -o "\"(${alfresco_dir})\",\"id\":\"[-a-zA-Z0-9]*" | cut -d'"' -f6) # ou encore ID_dir_alfresco=$(echo "$rep1" | cut -d'"' -f258)
 if [ -z "$ID_dir_alfresco" ]; then echo -e "\n$red[ Error ] : Dossier ( $blu${alfresco_target}$red ) inexistant dans Alfresco\n" && exit 1; fi
 
